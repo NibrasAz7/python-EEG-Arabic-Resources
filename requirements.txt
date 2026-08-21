@@ -1,0 +1,26 @@
+# Python dependencies for python-EEG-Arabic-Resources
+# EEG Signal Processing with Python (Arabic Book)
+
+# Core scientific stack
+numpy>=1.24
+scipy>=1.11
+pandas>=2.0
+matplotlib>=3.7
+seaborn>=0.12
+
+# EEG-specific
+mne>=1.5
+moabb>=0.5
+
+# Machine learning
+scikit-learn>=1.3
+
+# Visualization extras
+plotly>=5.15
+
+# Real-time (Chapter 8)
+pylsl>=1.16
+
+# Utilities
+pathlib2>=2.3
+tqdm>=4.65
