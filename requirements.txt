@@ -11,6 +11,7 @@ seaborn>=0.12
 # EEG-specific
 mne>=1.5
 moabb>=0.5
+wfdb>=4.1
 
 # Machine learning
 scikit-learn>=1.3

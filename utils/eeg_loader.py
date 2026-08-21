@@ -1,7 +1,7 @@
 """Shared EEG data loading utilities for the Arabic EEG book.
 
 This module provides functions to load:
-1. Local auditory EEG data (PhysioNet, 4 channels, 20 subjects)
+1. Local auditory EEG data (PhysioNet, 4 channels, 20 subjects, WFDB format)
 2. MOABB datasets (motor imagery, P300, SSVEP)
 
 Usage:
@@ -14,11 +14,10 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 
 # Local dataset constants
 LOCAL_CHANNELS = ["P4", "Cz", "F8", "T7"]
-LOCAL_SAMPLING_RATE = 1000  # Hz
+LOCAL_SAMPLING_RATE = 200  # Hz (from .hea header files)
 LOCAL_N_SUBJECTS = 20
 LOCAL_N_EXPERIMENTS = 10
 
@@ -31,8 +30,10 @@ def load_local_eeg(
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """Load a single recording from the local auditory EEG dataset.
 
+    Reads WFDB format files (.dat + .hea) using the wfdb library.
+
     Args:
-        data_dir: Path to the directory containing CSV files.
+        data_dir: Path to the directory containing .dat/.hea files.
         subject: Subject number (1-20).
         experiment: Experiment number (1-10).
         session: Optional session number (1-3) for multi-session experiments.
@@ -43,21 +44,29 @@ def load_local_eeg(
         - signals: 2D array of shape (n_samples, n_channels)
         - channel_names: list of channel names
     """
+    import wfdb
+
     data_dir = Path(data_dir)
 
     if session is not None:
-        filename = f"s{subject:02d}_ex{experiment:02d}_s{session:02d}.csv"
+        record_name = f"s{subject:02d}_ex{experiment:02d}_s{session:02d}"
     else:
-        filename = f"s{subject:02d}_ex{experiment:02d}.csv"
+        record_name = f"s{subject:02d}_ex{experiment:02d}"
 
-    filepath = data_dir / filename
-    if not filepath.exists():
-        raise FileNotFoundError(f"EEG file not found: {filepath}")
+    record_path = data_dir / record_name
+    if not record_path.with_suffix(".hea").exists():
+        raise FileNotFoundError(f"EEG file not found: {record_path}.hea")
 
-    df = pd.read_csv(filepath)
-    timestamps = df.iloc[:, 0].values
-    signals = df.iloc[:, 1:].values
-    channel_names = list(df.columns[1:])
+    # Read WFDB record
+    record = wfdb.rdsamp(str(record_path))
+    signals, meta = record
+
+    # Build timestamps in milliseconds
+    fs = meta["fs"]
+    n_samples = signals.shape[0]
+    timestamps = np.arange(n_samples) * (1000.0 / fs)
+
+    channel_names = meta["sig_name"]
 
     return timestamps, signals, channel_names
 
@@ -69,7 +78,7 @@ def load_local_subject_all(
     """Load all recordings for a single subject.
 
     Args:
-        data_dir: Path to the directory containing CSV files.
+        data_dir: Path to the directory containing .dat/.hea files.
         subject: Subject number (1-20).
 
     Returns:
@@ -87,8 +96,8 @@ def load_local_subject_all(
             except FileNotFoundError:
                 pass
 
-    # Experiments 5-10 have single sessions
-    for exp in [5, 6, 7, 8, 9, 10]:
+    # Experiments 3-10 have single sessions
+    for exp in [3, 4, 5, 6, 7, 8, 9, 10]:
         try:
             rec = load_local_eeg(data_dir, subject, exp)
             recordings.append(rec)
@@ -137,9 +146,10 @@ if __name__ == "__main__":
 
     data_dir = sys.argv[1] if len(sys.argv) > 1 else "."
     try:
-        ts, sig, ch = load_local_eeg(data_dir, subject=1, experiment=1, session=1)
+        ts, sig, ch = load_local_eeg(data_dir, subject=1, experiment=1, session=2)
         print(f"Loaded: {sig.shape[0]} samples, {sig.shape[1]} channels: {ch}")
         print(f"Duration: {sig.shape[0] / LOCAL_SAMPLING_RATE:.2f} seconds")
+        print(f"Sampling rate: {LOCAL_SAMPLING_RATE} Hz")
     except FileNotFoundError as e:
         print(f"Could not load test file: {e}")
-        print("Usage: python eeg_loader.py <path_to_csv_directory>")
+        print("Usage: python eeg_loader.py <path_to_wfdb_directory>")

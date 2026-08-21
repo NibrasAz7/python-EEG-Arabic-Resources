@@ -17,7 +17,7 @@ from utils.eeg_loader import load_local_eeg
 from chapters.ch04.highpass import butter_highpass_filter
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
-FS = 1000
+FS = 200
 CUTOFF = 40.0  # Low-pass cutoff (Hz)
 ORDER = 4
 
@@ -43,12 +43,12 @@ def butter_lowpass_filter(data: np.ndarray, cutoff: float, fs: int, order: int =
 
 def main() -> None:
     timestamps, eeg_data, ch_names = load_local_eeg(
-        data_dir=DATA_DIR, subject=1, experiment=1, session=1
+        data_dir=DATA_DIR, subject=1, experiment=1, session=2
     )
     channel_data = eeg_data[:, 0]  # P4
 
     # First apply high-pass, then low-pass
-    filtered_hp = butter_highpass_filter(channel_data, cutoff=1.0, fs=FS, order=4)
+    filtered_hp = butter_highpass_filter(channel_data, cutoff=1.0, fs=FS, order=ORDER)
     filtered_lp = butter_lowpass_filter(filtered_hp, cutoff=CUTOFF, fs=FS, order=ORDER)
 
     n_plot = 5000

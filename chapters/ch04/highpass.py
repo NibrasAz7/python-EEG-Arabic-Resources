@@ -16,7 +16,7 @@ from scipy import signal
 from utils.eeg_loader import load_local_eeg
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
-FS = 1000  # Sampling rate (Hz)
+FS = 200  # Sampling rate (Hz)
 CUTOFF = 1.0  # High-pass cutoff (Hz)
 ORDER = 4  # Butterworth filter order
 
@@ -42,7 +42,7 @@ def butter_highpass_filter(data: np.ndarray, cutoff: float, fs: int, order: int 
 
 def main() -> None:
     timestamps, eeg_data, ch_names = load_local_eeg(
-        data_dir=DATA_DIR, subject=1, experiment=1, session=1
+        data_dir=DATA_DIR, subject=1, experiment=1, session=2
     )
     channel_data = eeg_data[:, 0]  # P4
 

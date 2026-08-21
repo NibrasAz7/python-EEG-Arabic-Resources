@@ -1,11 +1,16 @@
 """Download the local auditory EEG dataset from PhysioNet.
 
 Dataset: auditory-eeg/1.0.0
-Author: Nibras Abu Al-Dhahab
+Author: Nibras Abo Alzahab
 URL: https://physionet.org/content/auditory-eeg/1.0.0/
 
+The dataset is in WFDB format (.dat + .hea file pairs) organized under
+WFDB_Files/Raw_Data/. This script downloads the .dat and .hea files
+for the requested subjects.
+
 Usage:
-    python download_local.py --output ./local_data
+    python download_local.py --output ./data/local
+    python download_local.py --output ./data/local --subjects 1 2 3
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from urllib.request import urlretrieve
 
 
 PHYSIONET_BASE = "https://physionet.org/files/auditory-eeg/1.0.0/"
+RAW_DATA_URL = PHYSIONET_BASE + "WFDB_Files/Raw_Data/"
 
 
 def download_file(url: str, dest: Path) -> None:
@@ -28,8 +34,8 @@ def download_file(url: str, dest: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download auditory EEG data from PhysioNet")
-    parser.add_argument("--output", type=str, default="./local_data",
-                        help="Output directory (default: ./local_data)")
+    parser.add_argument("--output", type=str, default="./data/local",
+                        help="Output directory (default: ./data/local)")
     parser.add_argument("--subjects", type=int, nargs="*", default=None,
                         help="Subject numbers to download (default: all 20)")
     args = parser.parse_args()
@@ -41,35 +47,44 @@ def main() -> int:
 
     print(f"Downloading auditory EEG data to: {output_dir}")
     print(f"Subjects: {subjects}")
-    print(f"Source: {PHYSIONET_BASE}\n")
+    print(f"Source: {RAW_DATA_URL}\n")
 
-    # Download RECORDS.txt first to get file list
-    records_url = PHYSIONET_BASE + "RECORDS.txt"
-    records_path = output_dir / "RECORDS.txt"
-    download_file(records_url, records_path)
+    # Build the file list: each subject has experiments 1-10
+    # Experiments 1 and 2 have 3 sessions each (s01, s02, s03)
+    # Experiments 5-10 have a single session
+    # Experiments 3 and 4 are resting-state (eyes open/closed) — also single session
+    recordings = []
+    for subj in subjects:
+        for exp in [1, 2]:
+            for sess in [1, 2, 3]:
+                recordings.append(f"s{subj:02d}_ex{exp:02d}_s{sess:02d}")
+        for exp in [3, 4, 5, 6, 7, 8, 9, 10]:
+            recordings.append(f"s{subj:02d}_ex{exp:02d}")
 
-    # Read file list
-    with open(records_path) as f:
-        files = [line.strip() for line in f if line.strip()]
+    print(f"Total recordings: {len(recordings)} (each has .dat + .hea)\n")
 
-    # Filter by requested subjects
-    def matches_subject(filename: str, subj: int) -> bool:
-        return filename.startswith(f"s{subj:02d}_")
+    downloaded = 0
+    skipped = 0
+    for i, rec in enumerate(recordings, 1):
+        for ext in [".hea", ".dat"]:
+            dest = output_dir / (rec + ext)
+            if dest.exists():
+                skipped += 1
+                continue
+            url = RAW_DATA_URL + rec + ext
+            try:
+                print(f"  [{i}/{len(recordings)}] {rec}{ext}", end=" ... ", flush=True)
+                urlretrieve(url, dest)
+                print("done")
+                downloaded += 1
+            except Exception as e:
+                print(f"failed: {e}")
+                # Remove partial file if any
+                if dest.exists():
+                    dest.unlink()
 
-    if args.subjects:
-        files = [f for f in files
-                 if any(matches_subject(f, s) for s in args.subjects)]
-
-    print(f"\nDownloading {len(files)} files...\n")
-    for i, filename in enumerate(files, 1):
-        dest = output_dir / filename
-        if dest.exists():
-            print(f"  [{i}/{len(files)}] {filename} (already exists, skipping)")
-            continue
-        url = PHYSIONET_BASE + filename
-        download_file(url, dest)
-
-    print(f"\nDone. {len(files)} files in {output_dir}")
+    print(f"\nDone. Downloaded: {downloaded}, skipped (already exist): {skipped}")
+    print(f"Files in {output_dir}: {len(list(output_dir.glob('*.dat')))} recordings")
     return 0
 
 
