@@ -3,6 +3,10 @@
 Demonstrates array creation, shape inspection, vectorized operations,
 and baseline removal on simulated 4-channel EEG data.
 
+NOTE: This uses simulated data (random noise), not real EEG.
+Real EEG has structured patterns; we use noise here only to
+demonstrate array operations.
+
 Usage:
     python numpy_basics.py
 """
@@ -27,11 +31,14 @@ def main() -> None:
 
     # Compute amplitude range for each channel
     amplitude = eeg_data.max(axis=1) - eeg_data.min(axis=1)
-    print(f"Amplitude range per channel: {amplitude}")
+    print(f"Amplitude range per channel (uV): {amplitude}")
 
-    # Verify baseline removal
+    # Verify baseline removal: means should be ~0 after centering
     print(f"Mean before removal: {eeg_data.mean(axis=1)}")
     print(f"Mean after removal:  {eeg_centered.mean(axis=1)}")
+
+    # Standard deviation per channel (power indicator)
+    print(f"Std per channel (uV): {eeg_data.std(axis=1)}")
 
 
 if __name__ == "__main__":
