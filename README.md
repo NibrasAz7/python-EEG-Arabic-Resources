@@ -71,7 +71,7 @@ The code uses a real EEG dataset from PhysioNet, not synthetic data, so students
 ```text
 python-EEG-Arabic-Resources/
 ├── chapters/                # Python scripts + notebooks per chapter
-│   ├── ch01/                # Introduction
+│   ├── ch01/                # Introduction to EEG (frequency bands analysis)
 │   ├── ch02/                # EEG fundamentals
 │   ├── ch03/                # Data loading & visualization
 │   ├── ch04/                # Bandpass filters (highpass, lowpass, bandpass)
@@ -105,7 +105,7 @@ python-EEG-Arabic-Resources/
 
 | Chapter | Topic | Scripts | Notebooks | Status |
 | ------- | ----- | ------- | --------- | ------ |
-| 1 | Introduction | | | Planned |
+| 1 | Introduction to EEG | 1 | 2 (1 AR + 1 EN) | Complete |
 | 2 | EEG fundamentals | | | Planned |
 | 3 | Data loading & visualization | | | Planned |
 | 4 | Bandpass filters | 3 | 6 (3 AR + 3 EN) | Complete |
