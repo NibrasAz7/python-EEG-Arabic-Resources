@@ -52,13 +52,13 @@ def main() -> int:
     # Build the file list: each subject has experiments 1-10
     # Experiments 1 and 2 have 3 sessions each (s01, s02, s03)
     # Experiments 5-10 have a single session
-    # Experiments 3 and 4 are resting-state (eyes open/closed) — also single session
+    # Experiments 3 and 4 (resting-state) are not available for all subjects
     recordings = []
     for subj in subjects:
         for exp in [1, 2]:
             for sess in [1, 2, 3]:
                 recordings.append(f"s{subj:02d}_ex{exp:02d}_s{sess:02d}")
-        for exp in [3, 4, 5, 6, 7, 8, 9, 10]:
+        for exp in [5, 6, 7, 8, 9, 10]:
             recordings.append(f"s{subj:02d}_ex{exp:02d}")
 
     print(f"Total recordings: {len(recordings)} (each has .dat + .hea)\n")
