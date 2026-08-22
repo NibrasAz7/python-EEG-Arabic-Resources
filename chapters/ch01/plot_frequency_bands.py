@@ -30,7 +30,7 @@ FREQ_BANDS = {
 
 def main() -> None:
     timestamps, eeg_data, ch_names = load_local_eeg(
-        data_dir=DATA_DIR, subject=1, experiment=1, session=2
+        data_dir=DATA_DIR, subject=7, experiment=1, session=2
     )
     channel_data = eeg_data[:, 0]  # P4
 
