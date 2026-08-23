@@ -3,6 +3,8 @@
 Applies Fast Fourier Transform to the P4 channel of the local
 auditory EEG dataset and plots the frequency spectrum with the
 five brain wave bands (delta, theta, alpha, beta, gamma) highlighted.
+Applies a 1-45 Hz bandpass and 50 Hz notch filter to clean
+the raw signal before analysis.
 
 Usage:
     python fft_analysis.py
@@ -16,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fft import fft, fftfreq
+from scipy.signal import butter, filtfilt, iirnotch
 
 from utils.eeg_loader import load_local_eeg
 
@@ -32,11 +35,20 @@ BANDS = [
 ]
 
 
+def clean_signal(signal, fs=FS, low=1.0, high=45.0, notch_freq=50.0):
+    b_bp, a_bp = butter(4, [low / (fs / 2), high / (fs / 2)], btype='band')
+    filtered = filtfilt(b_bp, a_bp, signal)
+    b_notch, a_notch = iirnotch(notch_freq, 30.0, fs=fs)
+    filtered = filtfilt(b_notch, a_notch, filtered)
+    return filtered
+
+
 def main() -> None:
     timestamps, eeg_data, ch_names = load_local_eeg(
         data_dir=DATA_DIR, subject=7, experiment=1, session=2
     )
     channel_data = eeg_data[:, 0]
+    channel_data = clean_signal(channel_data)
 
     spectrum = fft(channel_data)
     freqs = fftfreq(len(channel_data), 1 / FS)

@@ -3,6 +3,8 @@
 Applies CWT with Morlet wavelet to the P4 channel of the local
 auditory EEG dataset and plots a scalogram showing how frequency
 content changes over time.
+Applies a 1-45 Hz bandpass and 50 Hz notch filter to clean
+the raw signal before analysis.
 
 Usage:
     python wavelet_analysis.py
@@ -16,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import numpy as np
 import matplotlib.pyplot as plt
 import pywt
+from scipy.signal import butter, filtfilt, iirnotch
 
 from utils.eeg_loader import load_local_eeg
 
@@ -27,11 +30,20 @@ FREQ_MAX = 80
 NUM_FREQS = 100
 
 
+def clean_signal(signal, fs=FS, low=1.0, high=45.0, notch_freq=50.0):
+    b_bp, a_bp = butter(4, [low / (fs / 2), high / (fs / 2)], btype='band')
+    filtered = filtfilt(b_bp, a_bp, signal)
+    b_notch, a_notch = iirnotch(notch_freq, 30.0, fs=fs)
+    filtered = filtfilt(b_notch, a_notch, filtered)
+    return filtered
+
+
 def main() -> None:
     timestamps, eeg_data, ch_names = load_local_eeg(
         data_dir=DATA_DIR, subject=7, experiment=1, session=2
     )
     channel_data = eeg_data[:N_PLOT, 0]
+    channel_data = clean_signal(channel_data)
 
     freqs = np.linspace(FREQ_MIN, FREQ_MAX, NUM_FREQS)
     scales = pywt.frequency2scale("cmor1.5-1.0", freqs / FS)
