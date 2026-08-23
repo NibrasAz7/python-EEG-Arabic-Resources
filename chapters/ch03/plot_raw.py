@@ -1,4 +1,4 @@
-"""Plot raw EEG signal in the time domain.
+"""Plot raw EEG signal in the time domain (interactive Plotly version).
 
 Plots all 4 channels as separate subplots showing amplitude vs time.
 Reveals drift, artifacts, and frequency content visually.
@@ -13,7 +13,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from utils.eeg_loader import load_local_eeg
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
@@ -27,17 +28,34 @@ def main() -> None:
 
     time_sec = np.arange(eeg_data.shape[0]) / FS
 
-    fig, axes = plt.subplots(4, 1, figsize=(12, 8), sharex=True)
+    fig = make_subplots(
+        rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.03,
+        subplot_titles=[f'{ch}' for ch in ch_names],
+    )
     for i, ch in enumerate(ch_names):
-        axes[i].plot(time_sec, eeg_data[:, i], linewidth=0.5, color='steelblue')
-        axes[i].set_ylabel(f'{ch} (uV)')
-        axes[i].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(
+                x=time_sec, y=eeg_data[:, i],
+                mode='lines', line=dict(width=0.5, color='steelblue'),
+                name=ch,
+            ),
+            row=i + 1, col=1,
+        )
+        fig.update_yaxes(title_text=f'{ch} (uV)', row=i + 1, col=1)
 
-    axes[-1].set_xlabel('Time (s)')
-    axes[0].set_title('Raw EEG Signal - Subject 7, Experiment 1')
-    plt.tight_layout()
-    plt.savefig(Path(__file__).resolve().parent / 'raw_eeg_plot.png', dpi=150)
-    plt.show()
+    fig.update_layout(
+        title='Raw EEG Signal - Subject 7, Experiment 1',
+        template='plotly',
+        showlegend=False,
+        height=800,
+    )
+    fig.update_xaxes(title_text='Time (s)', row=4, col=1)
+
+    fig.show()
+    fig.write_html(
+        Path(__file__).resolve().parent / 'raw_eeg_plot.html',
+        include_plotlyjs='cdn',
+    )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Create a heatmap of EEG data.
+"""Create a heatmap of EEG data (interactive Plotly version).
 
 Displays signal amplitude across channels and time using a color-coded
 2D grid. Reveals patterns that are hard to see in line plots.
@@ -12,7 +12,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objects as go
 from utils.eeg_loader import load_local_eeg
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
@@ -24,23 +25,29 @@ def main() -> None:
         data_dir=DATA_DIR, subject=7, experiment=1, session=2
     )
 
-    fig, ax = plt.subplots(figsize=(12, 4))
-    im = ax.imshow(
-        eeg_data.T,  # shape: (channels, samples)
-        aspect='auto',
-        cmap='RdBu_r',
-        vmin=-100, vmax=100,
-        extent=[0, eeg_data.shape[0] / FS, 4, 0]
+    time_sec = np.arange(eeg_data.shape[0]) / FS
+
+    fig = go.Figure(data=go.Heatmap(
+        z=eeg_data.T,
+        x=time_sec,
+        y=ch_names,
+        colorscale='RdBu_r',
+        zmin=-100, zmax=100,
+        colorbar=dict(title='Amplitude (uV)'),
+    ))
+    fig.update_layout(
+        title='EEG Heatmap - Subject 7',
+        xaxis_title='Time (s)',
+        yaxis_title='Channel',
+        template='plotly',
     )
-    ax.set_yticks([0.5, 1.5, 2.5, 3.5])
-    ax.set_yticklabels(ch_names)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Channel')
-    ax.set_title('EEG Heatmap - Subject 7')
-    plt.colorbar(im, ax=ax, label='Amplitude (uV)')
-    plt.tight_layout()
-    plt.savefig(Path(__file__).resolve().parent / 'eeg_heatmap.png', dpi=150)
-    plt.show()
+    fig.update_yaxes(autorange='reversed')
+
+    fig.show()
+    fig.write_html(
+        Path(__file__).resolve().parent / 'eeg_heatmap.html',
+        include_plotlyjs='cdn',
+    )
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-"""Plot EEG frequency bands using Welch's method.
+"""Plot EEG frequency bands using Welch's method (interactive Plotly version).
 
 Computes the power spectral density of the P4 channel from the local
 auditory EEG dataset and highlights the five main frequency bands
-(delta, theta, alpha, beta, gamma).
+(delta, theta, alpha, beta, gamma). Uses Plotly for interactive hover.
 
 Usage:
     python plot_frequency_bands.py
@@ -10,8 +10,8 @@ Usage:
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 from scipy import signal
 
 from utils.eeg_loader import load_local_eeg
@@ -34,25 +34,40 @@ def main() -> None:
     )
     channel_data = eeg_data[:, 0]  # P4
 
-    # Compute power spectral density using Welch's method
     freqs, psd = signal.welch(channel_data, fs=FS, nperseg=1024)
 
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.semilogy(freqs, psd, color="black", linewidth=0.8)
+    fig = go.Figure()
 
+    # Main PSD curve (log scale y-axis)
+    fig.add_trace(go.Scatter(
+        x=freqs, y=psd, mode="lines", name="PSD",
+        line=dict(color="black", width=1),
+        hovertemplate="Freq: %{x:.1f} Hz<br>Power: %{y:.2e}<extra></extra>",
+    ))
+
+    # Band shading
     for name, (lo, hi, color) in FREQ_BANDS.items():
         mask = (freqs >= lo) & (freqs <= hi)
-        ax.fill_between(freqs, psd, where=mask, alpha=0.3, color=color, label=name)
+        fig.add_trace(go.Scatter(
+            x=freqs[mask], y=psd[mask],
+            fill="tozeroy", mode="none",
+            name=name, fillcolor=color,
+            opacity=0.3,
+            hovertemplate=f"{name}<br>Freq: %{{x:.1f}} Hz<br>Power: %{{y:.2e}}<extra></extra>",
+        ))
 
-    ax.set_xlabel("Frequency (Hz)")
-    ax.set_ylabel("Power (uV^2 / Hz)")
-    ax.set_title("EEG Frequency Bands (P4 channel, subject 1)")
-    ax.set_xlim(0, 100)
-    ax.legend(loc="upper right")
-    plt.tight_layout()
-    out = Path(__file__).resolve().parent / "freq_bands_result.png"
-    plt.savefig(out, dpi=150)
+    fig.update_layout(
+        title="EEG Frequency Bands (P4 channel, subject 7)",
+        xaxis_title="Frequency (Hz)", yaxis_title="Power (uV^2 / Hz)",
+        xaxis=dict(range=[0, 100]), yaxis_type="log",
+        height=500, hovermode="x unified",
+    )
+
+    out = Path(__file__).resolve().parent / "freq_bands_result.html"
+    fig.write_html(out, include_plotlyjs="cdn")
     print(f"Saved: {out}")
+
+    fig.show()
 
 
 if __name__ == "__main__":

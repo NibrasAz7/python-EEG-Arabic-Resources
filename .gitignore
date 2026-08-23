@@ -1,4 +1,6 @@
 ﻿data/local/
 __pycache__/
 *.pyc
+*.html
+*.png
 

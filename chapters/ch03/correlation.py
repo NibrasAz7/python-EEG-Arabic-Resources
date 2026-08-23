@@ -1,4 +1,4 @@
-"""Compute and plot the correlation matrix between EEG channels.
+"""Compute and plot the correlation matrix between EEG channels (interactive Plotly version).
 
 Calculates Pearson correlation coefficients between all pairs of
 channels and displays them as a color-coded matrix with annotated
@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from utils.eeg_loader import load_local_eeg
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
@@ -28,25 +28,35 @@ def main() -> None:
     # Compute correlation matrix
     corr_matrix = np.corrcoef(eeg_data.T)
 
+    # Build text annotations for each cell
+    text = [[f'{corr_matrix[i, j]:.2f}' for j in range(len(ch_names))]
+            for i in range(len(ch_names))]
+
     # Plot
-    fig, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
-    ax.set_xticks(range(len(ch_names)))
-    ax.set_yticks(range(len(ch_names)))
-    ax.set_xticklabels(ch_names)
-    ax.set_yticklabels(ch_names)
-    ax.set_title('EEG Channel Correlation Matrix')
+    fig = go.Figure(data=go.Heatmap(
+        z=corr_matrix,
+        x=ch_names,
+        y=ch_names,
+        colorscale='RdBu_r',
+        zmin=-1, zmax=1,
+        text=text,
+        texttemplate='%{text}',
+        textfont=dict(size=10),
+        colorbar=dict(title='Correlation'),
+    ))
+    fig.update_layout(
+        title='EEG Channel Correlation Matrix',
+        xaxis_title='Channel',
+        yaxis_title='Channel',
+        template='plotly',
+    )
+    fig.update_yaxes(autorange='reversed')
 
-    # Annotate each cell with the correlation value
-    for i in range(len(ch_names)):
-        for j in range(len(ch_names)):
-            ax.text(j, i, f'{corr_matrix[i, j]:.2f}',
-                    ha='center', va='center', fontsize=10)
-
-    plt.colorbar(im, label='Correlation')
-    plt.tight_layout()
-    plt.savefig(Path(__file__).resolve().parent / 'correlation_matrix.png', dpi=150)
-    plt.show()
+    fig.show()
+    fig.write_html(
+        Path(__file__).resolve().parent / 'correlation_matrix.html',
+        include_plotlyjs='cdn',
+    )
 
     # Print numerical values
     print("Correlation matrix:")

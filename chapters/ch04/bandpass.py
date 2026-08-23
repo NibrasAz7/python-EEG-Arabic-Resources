@@ -1,4 +1,4 @@
-"""Band-pass Butterworth filter for EEG signals.
+"""Band-pass Butterworth filter for EEG signals (interactive Plotly version).
 
 Applies a 1-40 Hz band-pass filter to the P4 channel of the local
 auditory EEG dataset in a single step and plots the result.
@@ -9,9 +9,10 @@ Usage:
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from utils.eeg_loader import load_local_eeg
 
@@ -56,17 +57,32 @@ def main() -> None:
     )
 
     n_plot = 5000
-    fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
-    axes[0].plot(timestamps[:n_plot], channel_data[:n_plot], label="Raw", color="gray")
-    axes[0].set_ylabel("EEG (uV)")
-    axes[0].set_title("Raw EEG (P4)")
-    axes[1].plot(timestamps[:n_plot], filtered[:n_plot], label="Band-pass", color="blue")
-    axes[1].set_ylabel("EEG (uV)")
-    axes[1].set_xlabel("Time (ms)")
-    axes[1].set_title(f"Band-pass filtered ({LOWCUT}-{HIGHCUT} Hz)")
-    plt.tight_layout()
-    out = Path(__file__).resolve().parent / "bandpass_result.png"
-    plt.savefig(out, dpi=150)
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+        subplot_titles=("Raw EEG (P4)", f"Band-pass filtered ({LOWCUT}-{HIGHCUT} Hz)"),
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps[:n_plot], y=channel_data[:n_plot],
+            name="Raw", line=dict(color="gray"),
+        ),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps[:n_plot], y=filtered[:n_plot],
+            name="Band-pass", line=dict(color="blue"),
+        ),
+        row=2, col=1,
+    )
+    fig.update_yaxes(title_text="EEG (uV)", row=1, col=1)
+    fig.update_yaxes(title_text="EEG (uV)", row=2, col=1)
+    fig.update_xaxes(title_text="Time (ms)", row=2, col=1)
+    fig.update_layout(template="plotly", showlegend=False)
+
+    fig.show()
+    out = Path(__file__).resolve().parent / "bandpass_result.html"
+    fig.write_html(out, include_plotlyjs="cdn")
     print(f"Saved: {out}")
 
 

@@ -1,4 +1,4 @@
-"""Low-pass Butterworth filter for EEG signals.
+"""Low-pass Butterworth filter for EEG signals (interactive Plotly version).
 
 Applies a 40 Hz low-pass filter to the output of the high-pass filter
 and plots the result before and after.
@@ -9,9 +9,10 @@ Usage:
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from utils.eeg_loader import load_local_eeg
 from chapters.ch04.highpass import butter_highpass_filter
@@ -52,17 +53,29 @@ def main() -> None:
     filtered_lp = butter_lowpass_filter(filtered_hp, cutoff=CUTOFF, fs=FS, order=ORDER)
 
     n_plot = 5000
-    fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
-    axes[0].plot(timestamps[:n_plot], filtered_hp[:n_plot], label="After HP only")
-    axes[0].set_ylabel("EEG (uV)")
-    axes[0].set_title("Before low-pass filter")
-    axes[1].plot(timestamps[:n_plot], filtered_lp[:n_plot], label="After LP", color="red")
-    axes[1].set_ylabel("EEG (uV)")
-    axes[1].set_xlabel("Time (ms)")
-    axes[1].set_title(f"After low-pass filter ({CUTOFF} Hz)")
-    plt.tight_layout()
-    out = Path(__file__).resolve().parent / "lowpass_result.png"
-    plt.savefig(out, dpi=150)
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+        subplot_titles=("Before low-pass filter", f"After low-pass filter ({CUTOFF} Hz)"),
+    )
+    fig.add_trace(
+        go.Scatter(x=timestamps[:n_plot], y=filtered_hp[:n_plot], name="After HP only"),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps[:n_plot], y=filtered_lp[:n_plot],
+            name="After LP", line=dict(color="red"),
+        ),
+        row=2, col=1,
+    )
+    fig.update_yaxes(title_text="EEG (uV)", row=1, col=1)
+    fig.update_yaxes(title_text="EEG (uV)", row=2, col=1)
+    fig.update_xaxes(title_text="Time (ms)", row=2, col=1)
+    fig.update_layout(template="plotly", showlegend=False)
+
+    fig.show()
+    out = Path(__file__).resolve().parent / "lowpass_result.html"
+    fig.write_html(out, include_plotlyjs="cdn")
     print(f"Saved: {out}")
 
 

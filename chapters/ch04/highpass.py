@@ -1,4 +1,4 @@
-"""High-pass Butterworth filter for EEG signals.
+"""High-pass Butterworth filter for EEG signals (interactive Plotly version).
 
 Applies a 1 Hz high-pass filter to the P4 channel of the local
 auditory EEG dataset and plots the result before and after filtering.
@@ -9,9 +9,10 @@ Usage:
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from utils.eeg_loader import load_local_eeg
 
@@ -49,17 +50,29 @@ def main() -> None:
     filtered = butter_highpass_filter(channel_data, cutoff=CUTOFF, fs=FS, order=ORDER)
 
     n_plot = 5000
-    fig, axes = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
-    axes[0].plot(timestamps[:n_plot], channel_data[:n_plot], label="Raw")
-    axes[0].set_ylabel("EEG (uV)")
-    axes[0].set_title("Before high-pass filter")
-    axes[1].plot(timestamps[:n_plot], filtered[:n_plot], label="Filtered", color="green")
-    axes[1].set_ylabel("EEG (uV)")
-    axes[1].set_xlabel("Time (ms)")
-    axes[1].set_title(f"After high-pass filter ({CUTOFF} Hz)")
-    plt.tight_layout()
-    out = Path(__file__).resolve().parent / "highpass_result.png"
-    plt.savefig(out, dpi=150)
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+        subplot_titles=("Before high-pass filter", f"After high-pass filter ({CUTOFF} Hz)"),
+    )
+    fig.add_trace(
+        go.Scatter(x=timestamps[:n_plot], y=channel_data[:n_plot], name="Raw"),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps[:n_plot], y=filtered[:n_plot],
+            name="Filtered", line=dict(color="green"),
+        ),
+        row=2, col=1,
+    )
+    fig.update_yaxes(title_text="EEG (uV)", row=1, col=1)
+    fig.update_yaxes(title_text="EEG (uV)", row=2, col=1)
+    fig.update_xaxes(title_text="Time (ms)", row=2, col=1)
+    fig.update_layout(template="plotly", showlegend=False)
+
+    fig.show()
+    out = Path(__file__).resolve().parent / "highpass_result.html"
+    fig.write_html(out, include_plotlyjs="cdn")
     print(f"Saved: {out}")
 
 

@@ -1,4 +1,4 @@
-"""Introduction to SciPy signal processing for EEG.
+"""Introduction to SciPy signal processing for EEG (interactive Plotly version).
 
 Demonstrates designing a bandpass filter (8-13 Hz, alpha band)
 and applying it to a synthetic test signal using zero-phase filtering.
@@ -10,8 +10,11 @@ Usage:
     python scipy_signal_intro.py
 """
 
+from pathlib import Path
+
 import numpy as np
 from scipy import signal
+import plotly.graph_objects as go
 
 
 def main() -> None:
@@ -35,6 +38,7 @@ def main() -> None:
     print(f"Filtered signal std: {filtered.std():.3f}")
 
     # Verify: compute PSD and find peak frequency
+    freqs_orig, psd_orig = signal.welch(test_signal, fs=fs, nperseg=256)
     freqs, psd = signal.welch(filtered, fs=fs, nperseg=256)
     peak_idx = np.argmax(psd)
     print(f"Peak frequency: {freqs[peak_idx]:.1f} Hz")
@@ -45,6 +49,29 @@ def main() -> None:
     signal_mask = (freqs > 8) & (freqs < 13)
     ratio = psd[signal_mask].max() / psd[noise_mask].max()
     print(f"Signal-to-noise ratio (alpha vs 40-60 Hz): {ratio:.1f}x")
+
+    # Plot PSD comparison (original vs filtered) on log scale
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=freqs_orig, y=psd_orig, mode='lines',
+        name='Original', line=dict(color='steelblue', width=1.5),
+    ))
+    fig.add_trace(go.Scatter(
+        x=freqs, y=psd, mode='lines',
+        name='Filtered (8-13 Hz)', line=dict(color='red', width=1.5),
+    ))
+    fig.update_layout(
+        title='Power Spectral Density: Original vs Filtered',
+        xaxis_title='Frequency (Hz)',
+        yaxis_title='PSD (V^2/Hz)',
+        yaxis_type='log',
+        template='plotly',
+    )
+    fig.show()
+    fig.write_html(
+        Path(__file__).resolve().parent / 'scipy_signal_psd.html',
+        include_plotlyjs='cdn',
+    )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""3D visualization of EEG data.
+"""3D visualization of EEG data (interactive Plotly version).
 
 Plots signal amplitude as a 3D scatter plot with time, channel, and
 amplitude axes. Subsamples data for visual clarity.
@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from utils.eeg_loader import load_local_eeg
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
@@ -30,29 +30,40 @@ def main() -> None:
     time_sec = np.arange(0, eeg_data.shape[0], step) / FS
     data_sub = eeg_data[::step, :]
 
-    fig = plt.figure(figsize=(12, 6))
-    ax = fig.add_subplot(111, projection='3d')
-
+    fig = go.Figure()
     for i, ch in enumerate(ch_names):
-        ax.scatter(
-            time_sec,
-            np.full_like(time_sec, i),
-            data_sub[:, i],
-            c=data_sub[:, i],
-            cmap='viridis',
-            s=1,
-            label=ch
-        )
+        fig.add_trace(go.Scatter3d(
+            x=time_sec,
+            y=np.full_like(time_sec, i),
+            z=data_sub[:, i],
+            mode='markers',
+            marker=dict(
+                size=1,
+                color=data_sub[:, i],
+                colorscale='viridis',
+            ),
+            name=ch,
+        ))
 
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Channel')
-    ax.set_zlabel('Amplitude (uV)')
-    ax.set_yticks(range(len(ch_names)))
-    ax.set_yticklabels(ch_names)
-    ax.set_title('3D EEG Visualization - Subject 7')
-    plt.tight_layout()
-    plt.savefig(Path(__file__).resolve().parent / 'eeg_3d.png', dpi=150)
-    plt.show()
+    fig.update_layout(
+        title='3D EEG Visualization - Subject 7',
+        scene=dict(
+            xaxis_title='Time (s)',
+            yaxis_title='Channel',
+            zaxis_title='Amplitude (uV)',
+            yaxis=dict(
+                tickvals=list(range(len(ch_names))),
+                ticktext=ch_names,
+            ),
+        ),
+        template='plotly',
+    )
+
+    fig.show()
+    fig.write_html(
+        Path(__file__).resolve().parent / 'eeg_3d.html',
+        include_plotlyjs='cdn',
+    )
 
 
 if __name__ == "__main__":
