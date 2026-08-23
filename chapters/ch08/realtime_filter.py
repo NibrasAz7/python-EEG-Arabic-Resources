@@ -1,8 +1,8 @@
-"""Real-time bandpass filtering with streaming data.
+"""Real-time bandpass filtering with state maintenance.
 
-Demonstrates real-time Butterworth bandpass filtering (0.5-30 Hz)
-using scipy.signal.lfilter with state maintenance between chunks,
-and compares it to offline filtfilt filtering.
+Demonstrates streaming bandpass filtering using scipy.signal.lfilter
+with filter state (zi) maintenance between chunks, and compares
+the result with offline filtfilt filtering.
 
 Usage:
     python realtime_filter.py
@@ -15,65 +15,60 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import signal
+from scipy.signal import butter, lfilter, filtfilt, lfilter_zi
 
 from utils.eeg_loader import load_local_eeg
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "local"
 FS = 200
-LOWCUT = 0.5
-HIGHCUT = 30.0
-ORDER = 4
-CHUNK_SIZE = 50
 N_PLOT = 5000
+CHUNK_SIZE = 50
+LOWCUT = 0.5
+HIGHCUT = 30
+ORDER = 4
 
 
 def main() -> None:
     timestamps, eeg_data, ch_names = load_local_eeg(
         data_dir=DATA_DIR, subject=7, experiment=1, session=2
     )
-    channel_data = eeg_data[:, 0]
+    channel_data = eeg_data[:N_PLOT, 0]
 
-    n_samples = min(N_PLOT, len(channel_data))
-    signal_plot = channel_data[:n_samples]
+    b, a = butter(ORDER, [LOWCUT / (FS / 2), HIGHCUT / (FS / 2)], btype='band')
+    zi = lfilter_zi(b, a)
+    zi = zi * channel_data[0]
 
-    nyq = 0.5 * FS
-    b, a = signal.butter(ORDER, [LOWCUT / nyq, HIGHCUT / nyq], btype="band", analog=False)
+    realtime_output = np.zeros(N_PLOT)
+    for i in range(0, N_PLOT, CHUNK_SIZE):
+        end = min(i + CHUNK_SIZE, N_PLOT)
+        chunk = channel_data[i:end]
+        filtered_chunk, zi = lfilter(b, a, chunk, zi=zi)
+        realtime_output[i:end] = filtered_chunk
 
-    zi = signal.lfilter_zi(b, a)
-    state = zi * signal_plot[0]
-    realtime_filtered = np.zeros(n_samples)
+    offline_output = filtfilt(b, a, channel_data)
 
-    for start in range(0, n_samples, CHUNK_SIZE):
-        end = min(start + CHUNK_SIZE, n_samples)
-        chunk = signal_plot[start:end]
-        filtered_chunk, state = signal.lfilter(b, a, chunk, zi=state)
-        realtime_filtered[start:end] = filtered_chunk
+    time_sec = np.arange(N_PLOT) / FS
 
-    offline_filtered = signal.filtfilt(b, a, signal_plot)
-
-    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-
-    axes[0].plot(signal_plot, color="blue", linewidth=0.5)
-    axes[0].set_ylabel("Amplitude (uV)")
-    axes[0].set_title("Original Signal (P4 channel)")
+    fig, axes = plt.subplots(2, 1, figsize=(14, 8))
+    axes[0].plot(time_sec, channel_data, linewidth=0.5, color='blue')
+    axes[0].set_xlabel('Time (s)')
+    axes[0].set_ylabel('Amplitude (uV)')
+    axes[0].set_title('Original signal - Channel P4')
     axes[0].grid(True, alpha=0.3)
 
-    axes[1].plot(realtime_filtered, color="green", linewidth=0.5, label="Real-time (lfilter)")
-    axes[1].plot(offline_filtered, color="red", linewidth=0.5, linestyle="--", label="Offline (filtfilt)")
-    axes[1].set_xlabel("Sample index")
-    axes[1].set_ylabel("Amplitude (uV)")
-    axes[1].set_title(f"Bandpass Filtered ({LOWCUT}-{HIGHCUT} Hz, order {ORDER})")
-    axes[1].legend(loc="upper right")
+    axes[1].plot(time_sec, realtime_output, linewidth=0.5, color='green', label='Real-time (lfilter)')
+    axes[1].plot(time_sec, offline_output, linewidth=0.5, color='red',
+                 linestyle='--', label='Offline (filtfilt)')
+    axes[1].set_xlabel('Time (s)')
+    axes[1].set_ylabel('Amplitude (uV)')
+    axes[1].set_title('Real-time vs Offline bandpass filter (0.5-30 Hz)')
+    axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
-    fig.suptitle("Real-time Bandpass Filter - Streaming vs Offline", fontsize=14, fontweight="bold")
-    plt.tight_layout()
-
-    out_path = Path(__file__).resolve().parent / "realtime_filter_result.png"
-    plt.savefig(out_path, dpi=150)
+    plt.suptitle('Real-time Bandpass Filter - Streaming vs Offline', fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.savefig(Path(__file__).resolve().parent / 'realtime_filter_result.png', dpi=150)
     plt.close()
-    print(f"Saved: {out_path}")
 
 
 if __name__ == "__main__":
