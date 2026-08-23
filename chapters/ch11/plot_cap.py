@@ -1,9 +1,7 @@
-"""Visualize electrode positions on a scalp topomap.
+"""Electrode position visualization for MOABB dataset.
 
-Loads the BNCI2014-001 motor imagery dataset (subject 1), extracts the
-channel positions from the raw MNE info, and plots the electrode
-positions on a 2D topomap with a circle representing the head and
-labeled dots for each of the 22 electrodes.
+Plots the 22-channel electrode positions of BNCI2014-001 on a
+2D scalp topomap using MNE's sensor plotting capabilities.
 
 Usage:
     python plot_cap.py
@@ -16,47 +14,49 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import matplotlib.pyplot as plt
-
 from moabb.datasets import BNCI2014_001
+
+OUTPUT_DIR = Path(__file__).resolve().parent
 
 
 def main() -> None:
-    out_dir = Path(__file__).resolve().parent
+    dataset = BNCI2014_001()
+    data = dataset.get_data(subjects=[1])
+    subject_data = data[1]
+    session_key = list(subject_data.keys())[0]
+    run_key = list(subject_data[session_key].keys())[0]
+    raw = subject_data[session_key][run_key]
 
-    ds = BNCI2014_001()
-    sessions = ds.get_data(subjects=[1])
-    first_run = next(iter(next(iter(next(iter(sessions.values())).values())).values()))
-
-    montage = first_run.get_montage()
+    montage = raw.get_montage()
     ch_pos = montage.get_positions()['ch_pos']
-    ch_names = [ch for ch in first_run.ch_names if ch in ch_pos]
-    pos = np.array([ch_pos[ch] for ch in ch_names])
+    ch_names = [ch for ch in raw.ch_names if ch in ch_pos and not ch.startswith('EOG')]
+    positions = np.array([ch_pos[ch] for ch in ch_names])
+    pos_2d = positions[:, :2]
 
-    fig, ax = plt.subplots(figsize=(8, 8))
-    head = plt.Circle((0, 0), 1.0, color='white', ec='black', linewidth=2)
-    ax.add_patch(head)
-    nose = plt.Polygon([[0, 1.0], [-0.06, 1.1], [0.06, 1.1]], color='black')
-    ax.add_patch(nose)
-
-    pos_2d = pos[:, :2]
     scale = 1.0 / np.max(np.abs(pos_2d))
     pos_2d = pos_2d * scale * 0.95
 
-    ax.scatter(pos_2d[:, 0], pos_2d[:, 1], s=120, c='#1f77b4',
-               edgecolors='black', zorder=5)
+    fig, ax = plt.subplots(figsize=(8, 8))
+    head_circle = plt.Circle((0, 0), 1.0, fill=False, color='black', linewidth=2)
+    ax.add_patch(head_circle)
+
+    nose = plt.Polygon([[0, 1.0], [-0.08, 1.12], [0.08, 1.12]], fill=False, color='black', linewidth=1.5)
+    ax.add_patch(nose)
+
+    ax.scatter(pos_2d[:, 0], pos_2d[:, 1], c='red', s=80, zorder=5, edgecolors='black')
     for i, name in enumerate(ch_names):
         ax.annotate(name, (pos_2d[i, 0], pos_2d[i, 1]),
-                    fontsize=7, ha='center', va='center', color='white',
-                    fontweight='bold')
+                    textcoords="offset points", xytext=(5, 5), fontsize=7)
 
-    ax.set_xlim(-1.2, 1.2)
-    ax.set_ylim(-1.2, 1.2)
+    ax.set_xlim(-1.3, 1.3)
+    ax.set_ylim(-1.3, 1.3)
     ax.set_aspect('equal')
+    ax.set_xlabel('X position')
+    ax.set_ylabel('Y position')
     ax.set_title('Electrode Positions - BNCI2014-001 (22 channels)')
-    ax.axis('off')
-
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(out_dir / 'plot_cap_result.png', dpi=150)
+    plt.savefig(OUTPUT_DIR / 'plot_cap_result.png', dpi=150)
     plt.close()
 
 

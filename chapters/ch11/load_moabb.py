@@ -1,10 +1,8 @@
-"""Load a MOABB dataset and print its structure.
+"""Load a MOABB dataset and explore its structure.
 
-Loads the BNCI2014-001 motor imagery dataset (subject 1 only) via MOABB,
-extracts epochs with the MotorImagery paradigm, prints the dataset
-structure (sessions, runs, channels, sampling rate) and epoch shapes,
-writes a text summary to moabb_info.txt, and saves a bar chart of the
-number of trials per class.
+Downloads BNCI2014-001 (Motor Imagery) for subject 1, extracts
+epochs using the MotorImagery paradigm, and prints the structure.
+Saves a bar chart of trial counts per class.
 
 Usage:
     python load_moabb.py
@@ -17,67 +15,49 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import matplotlib.pyplot as plt
-
 from moabb.datasets import BNCI2014_001
 from moabb.paradigms import MotorImagery
 
+OUTPUT_DIR = Path(__file__).resolve().parent
+
 
 def main() -> None:
-    out_dir = Path(__file__).resolve().parent
-
-    ds = BNCI2014_001()
-    sessions = ds.get_data(subjects=[1])
-
-    subject_key = list(sessions.keys())[0]
-    session_dict = sessions[subject_key]
-    n_sessions = len(session_dict)
-    n_runs = len(next(iter(session_dict.values())))
-    first_run = next(iter(next(iter(session_dict.values())).values()))
-    n_channels = len(first_run.ch_names)
-    sfreq = first_run.info['sfreq']
-    ch_names = first_run.ch_names
-
+    dataset = BNCI2014_001()
     paradigm = MotorImagery(n_classes=2)
-    X, labels, meta = paradigm.get_data(dataset=ds, subjects=[1])
 
-    unique_labels, counts = np.unique(labels, return_counts=True)
+    X, labels, meta = paradigm.get_data(dataset=dataset, subjects=[1])
 
-    lines = []
-    lines.append("MOABB BNCI2014-001 - Dataset Structure")
-    lines.append("=" * 45)
-    lines.append(f"Subject: 1")
-    lines.append(f"Sessions: {n_sessions}")
-    lines.append(f"Runs per session: {n_runs}")
-    lines.append(f"Channels: {n_channels}")
-    lines.append(f"Sampling rate: {sfreq} Hz")
-    lines.append(f"Channel names: {ch_names}")
-    lines.append("")
-    lines.append("Epochs (MotorImagery, n_classes=2)")
-    lines.append("-" * 45)
-    lines.append(f"X shape: {X.shape}")
-    lines.append(f"Labels shape: {labels.shape}")
-    lines.append(f"Meta shape: {meta.shape}")
-    lines.append(f"Unique labels: {list(unique_labels)}")
-    lines.append(f"Trials per class:")
-    for lab, cnt in zip(unique_labels, counts):
-        lines.append(f"  {lab}: {cnt}")
-    lines.append(f"Epoch samples: {X.shape[2]}")
-    lines.append(f"Epoch duration: {X.shape[2] / sfreq:.2f} s")
+    n_trials, n_channels, n_samples = X.shape
+    unique_labels = np.unique(labels)
+    trials_per_class = {label: np.sum(labels == label) for label in unique_labels}
 
-    summary = "\n".join(lines)
-    print(summary)
-    (out_dir / "moabb_info.txt").write_text(summary, encoding="utf-8")
+    info_lines = [
+        f"Dataset: BNCI2014-001 (Motor Imagery)",
+        f"Subject: 1",
+        f"Trials: {n_trials}",
+        f"Channels: {n_channels}",
+        f"Samples per trial: {n_samples}",
+        f"Sampling rate: 250 Hz",
+        f"Trial duration: {n_samples / 250:.2f} s",
+        f"Classes: {list(unique_labels)}",
+        f"Trials per class: {trials_per_class}",
+    ]
+    info_text = "\n".join(info_lines)
+    print(info_text)
+
+    with open(OUTPUT_DIR / "moabb_info.txt", "w") as f:
+        f.write(info_text)
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.bar(unique_labels, counts, color=['#1f77b4', '#ff7f0e'], edgecolor='black', linewidth=0.5)
-    ax.set_xlabel('Class label')
+    classes = list(trials_per_class.keys())
+    counts = list(trials_per_class.values())
+    ax.bar(classes, counts, color=['steelblue', 'orange'], edgecolor='black')
+    ax.set_xlabel('Class')
     ax.set_ylabel('Number of trials')
-    ax.set_title('Trials per class - BNCI2014-001 (subject 1)')
+    ax.set_title('Trial count per class - BNCI2014-001 Subject 1')
     ax.grid(True, alpha=0.3, axis='y')
-    for i, cnt in enumerate(counts):
-        ax.text(i, cnt + 1, str(cnt), ha='center', va='bottom', fontsize=11)
     plt.tight_layout()
-    plt.savefig(out_dir / 'load_moabb_result.png', dpi=150)
+    plt.savefig(OUTPUT_DIR / 'load_moabb_result.png', dpi=150)
     plt.close()
 
 
