@@ -1,9 +1,9 @@
 Dataset: BNCI2014-001 (Motor Imagery)
 Subject: 1
-Trials: 576
+Trials: 288
 Channels: 22
 Samples per trial: 1001
 Sampling rate: 250 Hz
 Trial duration: 4.00 s
-Classes: [np.str_('feet'), np.str_('left_hand'), np.str_('right_hand'), np.str_('tongue')]
-Trials per class: {np.str_('feet'): np.int64(144), np.str_('left_hand'): np.int64(144), np.str_('right_hand'): np.int64(144), np.str_('tongue'): np.int64(144)}
+Classes: [np.str_('left_hand'), np.str_('right_hand')]
+Trials per class: {np.str_('left_hand'): np.int64(144), np.str_('right_hand'): np.int64(144)}

@@ -41,7 +41,7 @@ def get_channel_positions():
 
 def main() -> None:
     dataset = BNCI2014_001()
-    paradigm = MotorImagery(n_classes=2)
+    paradigm = MotorImagery(n_classes=2, fmin=8, fmax=32)
     X, labels, meta = paradigm.get_data(dataset=dataset, subjects=[1])
 
     mask = (labels == 'left_hand') | (labels == 'right_hand')

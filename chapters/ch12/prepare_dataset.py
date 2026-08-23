@@ -1,7 +1,8 @@
 """Prepare MOABB dataset for machine learning.
 
 Loads BNCI2014-001 subject 1, filters to left_hand and right_hand
-classes, reshapes from 3D (trials, channels, samples) to 2D
+classes, applies a 50 Hz notch filter to remove powerline noise,
+reshapes from 3D (trials, channels, samples) to 2D
 (trials, features), and applies standardization. Visualizes the
 distribution before and after scaling.
 
@@ -16,21 +17,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.signal import iirnotch, filtfilt
 from moabb.datasets import BNCI2014_001
 from moabb.paradigms import MotorImagery
 from sklearn.preprocessing import StandardScaler
 
 OUTPUT_DIR = Path(__file__).resolve().parent
+FS = 250
+
+
+def apply_notch_filter(X, freq=50.0, fs=FS, Q=30.0):
+    b, a = iirnotch(freq, Q, fs=fs)
+    n_trials, n_channels, n_samples = X.shape
+    X_filtered = np.zeros_like(X)
+    for trial in range(n_trials):
+        for ch in range(n_channels):
+            X_filtered[trial, ch, :] = filtfilt(b, a, X[trial, ch, :])
+    return X_filtered
 
 
 def main() -> None:
     dataset = BNCI2014_001()
-    paradigm = MotorImagery(n_classes=2)
+    paradigm = MotorImagery(n_classes=2, fmin=8, fmax=32)
     X, labels, meta = paradigm.get_data(dataset=dataset, subjects=[1])
 
     mask = (labels == 'left_hand') | (labels == 'right_hand')
     X = X[mask]
     labels = labels[mask]
+
+    X = apply_notch_filter(X, freq=50.0)
 
     n_trials, n_channels, n_samples = X.shape
     X_2d = X.reshape(n_trials, n_channels * n_samples)
@@ -48,7 +63,7 @@ def main() -> None:
     axes[0].hist(X_2d[:, :1000].flatten(), bins=100, color='steelblue', alpha=0.7)
     axes[0].set_xlabel('Value')
     axes[0].set_ylabel('Count')
-    axes[0].set_title('Raw feature distribution (first 1000 features)')
+    axes[0].set_title('Filtered feature distribution (first 1000 features)')
     axes[0].grid(True, alpha=0.3)
 
     axes[1].hist(X_scaled[:, :1000].flatten(), bins=100, color='orange', alpha=0.7)
@@ -57,7 +72,7 @@ def main() -> None:
     axes[1].set_title('Standardized feature distribution (first 1000 features)')
     axes[1].grid(True, alpha=0.3)
 
-    plt.suptitle('Dataset Preparation - Standardization', fontsize=14)
+    plt.suptitle('Dataset Preparation - Notch Filter + Standardization', fontsize=14)
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig(OUTPUT_DIR / 'prepare_dataset_result.png', dpi=150)
     plt.close()
