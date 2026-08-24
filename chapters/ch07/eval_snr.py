@@ -45,8 +45,11 @@ def main() -> None:
     info = mne.create_info(ch_names, sfreq=FS, ch_types='eeg')
     raw = mne.io.RawArray(eeg_data.T * 1e-6, info, verbose=False)
 
+    # NOTE: ICA works best with more channels than components.
+    # With only 4 channels, we use n_components=3 to allow separation.
+    # Real ICA artifact removal typically uses 16-64+ channel montages.
     ica = mne.preprocessing.ICA(
-        n_components=4, random_state=97, max_iter=800, verbose=False
+        n_components=3, random_state=97, max_iter=800, verbose=False
     )
     ica.fit(raw, verbose=False)
 

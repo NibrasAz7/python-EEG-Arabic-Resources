@@ -20,6 +20,7 @@ from moabb.datasets import BNCI2014_001
 from moabb.paradigms import MotorImagery
 from sklearn.svm import SVC
 from sklearn.feature_selection import RFE
+from sklearn.model_selection import train_test_split
 
 OUTPUT_DIR = Path(__file__).resolve().parent
 FS = 250
@@ -74,9 +75,13 @@ def main() -> None:
         for _, _, bname in BANDS:
             feature_names.append(f'Ch{ch}_{bname}')
 
-    estimator = SVC(kernel='linear')
+    X_train, X_test, y_train, y_test = train_test_split(
+        features, labels, test_size=0.2, random_state=42, stratify=labels
+    )
+    estimator = SVC(kernel='linear', random_state=42)
     selector = RFE(estimator, n_features_to_select=N_SELECT)
-    selector.fit(features, labels)
+    selector = selector.fit(X_train, y_train)
+    print(f"Test accuracy with selected features: {selector.score(X_test, y_test):.4f}")
     rankings = selector.ranking_
     selected_mask = selector.support_
 

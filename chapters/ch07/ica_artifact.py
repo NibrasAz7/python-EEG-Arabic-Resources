@@ -32,8 +32,11 @@ def main() -> None:
     info = mne.create_info(ch_names, sfreq=FS, ch_types='eeg')
     raw = mne.io.RawArray(eeg_data.T * 1e-6, info, verbose=False)
 
+    # NOTE: ICA works best with more channels than components.
+    # With only 4 channels, we use n_components=3 to allow separation.
+    # Real ICA artifact removal typically uses 16-64+ channel montages.
     ica = mne.preprocessing.ICA(
-        n_components=4, random_state=97, max_iter=800, verbose=False
+        n_components=3, random_state=97, max_iter=800, verbose=False
     )
     ica.fit(raw, verbose=False)
 
@@ -54,7 +57,7 @@ def main() -> None:
     axes[0].legend(loc='upper right')
     axes[0].grid(True, alpha=0.3)
 
-    for i in range(4):
+    for i in range(components.shape[0]):
         offset = i * 200
         axes[1].plot(time_sec, components[i, :N_PLOT] * 1e6 + offset,
                      linewidth=0.5, color=colors[i], label=f'IC{i}')

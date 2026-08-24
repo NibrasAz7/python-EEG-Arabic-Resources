@@ -34,6 +34,9 @@ def main() -> None:
     n_trials, n_channels, n_samples = X.shape
     X_2d = X.reshape(n_trials, n_channels * n_samples)
 
+    # NOTE: In real ML pipelines, fit the scaler on training data only.
+    # This demo shows the effect of standardization on the full dataset
+    # for educational visualization purposes.
     scaler = StandardScaler()
     X_std = scaler.fit_transform(X_2d)
 

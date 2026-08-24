@@ -18,7 +18,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_predict
 from sklearn.metrics import accuracy_score
 
 from utils.eeg_loader import load_local_eeg
@@ -52,7 +52,11 @@ def main() -> None:
 
     knn = KNeighborsClassifier(n_neighbors=5)
     knn.fit(X_train, y_train)
-    predictions = knn.predict(features)
+    # Use cross-validated predictions for all windows to avoid data leakage
+    # (predicting on training data would inflate the visualization)
+    predictions = cross_val_predict(
+        KNeighborsClassifier(n_neighbors=5), features, labels, cv=5
+    )
     accuracy = accuracy_score(y_test, knn.predict(X_test))
 
     time_sec = np.arange(len(channel_data)) / FS

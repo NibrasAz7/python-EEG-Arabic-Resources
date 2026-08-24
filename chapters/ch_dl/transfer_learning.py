@@ -29,7 +29,7 @@ OUTPUT_DIR = Path(__file__).resolve().parent
 class EEGNet(nn.Module):
     def __init__(self, n_channels=22, n_samples=1001, n_classes=2, F1=8, D=2, F2=16, dropout=0.25):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, F1, (1, n_samples // 2), padding='same')
+        self.conv1 = nn.Conv2d(1, F1, (1, 64), padding='same')
         self.batchnorm1 = nn.BatchNorm2d(F1)
         self.depthwise = nn.Conv2d(F1, F1 * D, (n_channels, 1), groups=F1)
         self.batchnorm2 = nn.BatchNorm2d(F1 * D)
@@ -37,7 +37,7 @@ class EEGNet(nn.Module):
         self.pool1 = nn.AvgPool2d((1, 4))
         self.dropout1 = nn.Dropout(dropout)
         self.separable = nn.Sequential(
-            nn.Conv2d(F1 * D, F1 * D, (1, 16), padding='same'),
+            nn.Conv2d(F1 * D, F1 * D, (1, 16), padding='same', groups=F1 * D),
             nn.Conv2d(F1 * D, F2, (1, 1)),
         )
         self.batchnorm3 = nn.BatchNorm2d(F2)
@@ -85,6 +85,7 @@ def labels_to_int(labels):
 
 
 def train_model(model, X_train, y_train, epochs=30, lr=0.001, batch_size=32):
+    device = next(model.parameters()).device
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     losses = []
@@ -95,8 +96,8 @@ def train_model(model, X_train, y_train, epochs=30, lr=0.001, batch_size=32):
         n_batches = 0
         for start in range(0, n_samples, batch_size):
             idx = perm[start:start + batch_size]
-            batch_x = X_train[idx]
-            batch_y = y_train[idx]
+            batch_x = X_train[idx].to(device)
+            batch_y = y_train[idx].to(device)
             optimizer.zero_grad()
             outputs = model(batch_x)
             loss = criterion(outputs, batch_y)
@@ -111,11 +112,12 @@ def train_model(model, X_train, y_train, epochs=30, lr=0.001, batch_size=32):
 
 
 def evaluate_model(model, X_test, y_test):
+    device = next(model.parameters()).device
     model.eval()
     with torch.no_grad():
-        outputs = model(X_test)
+        outputs = model(X_test.to(device))
         _, predicted = torch.max(outputs, 1)
-    predicted = predicted.numpy()
+    predicted = predicted.cpu().numpy()
     accuracy = accuracy_score(y_test.numpy(), predicted)
     return accuracy
 
@@ -123,6 +125,8 @@ def evaluate_model(model, X_test, y_test):
 def main() -> None:
     torch.manual_seed(42)
     np.random.seed(42)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
 
     X1, labels1 = load_data(subject=1)
     y1 = labels_to_int(labels1)
@@ -153,7 +157,7 @@ def main() -> None:
     n_samples = X1.shape[2]
 
     print("Training EEGNet on subject 1 (30 epochs)...")
-    model_s1 = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2)
+    model_s1 = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2).to(device)
     train_model(model_s1, X1_train_t, y1_train_t, epochs=30, lr=0.001)
     acc_s1 = evaluate_model(model_s1, X1_test_t, y1_test_t)
     print(f"Subject 1 test accuracy: {acc_s1:.4f}")
@@ -163,7 +167,7 @@ def main() -> None:
     print(f"Zero-shot S1->S2 accuracy: {acc_zeroshot:.4f}")
 
     print("Fine-tuning pre-trained model on subject 2 (10 epochs, lr=0.0001)...")
-    model_finetune = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2)
+    model_finetune = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2).to(device)
     model_finetune.load_state_dict(model_s1.state_dict())
     train_model(model_finetune, X2_train_t, y2_train_t, epochs=10, lr=0.0001)
     acc_finetune = evaluate_model(model_finetune, X2_test_t, y2_test_t)
@@ -172,7 +176,7 @@ def main() -> None:
     torch.manual_seed(42)
     np.random.seed(42)
     print("Training fresh model on subject 2 from scratch (30 epochs)...")
-    model_scratch = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2)
+    model_scratch = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2).to(device)
     train_model(model_scratch, X2_train_t, y2_train_t, epochs=30, lr=0.001)
     acc_scratch = evaluate_model(model_scratch, X2_test_t, y2_test_t)
     print(f"S2 from scratch accuracy: {acc_scratch:.4f}")

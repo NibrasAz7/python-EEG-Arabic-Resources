@@ -30,7 +30,7 @@ CLASSES = ['left_hand', 'right_hand']
 class EEGNet(nn.Module):
     def __init__(self, n_channels=22, n_samples=1001, n_classes=2, F1=8, D=2, F2=16, dropout=0.25):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, F1, (1, n_samples // 2), padding='same')
+        self.conv1 = nn.Conv2d(1, F1, (1, 64), padding='same')
         self.batchnorm1 = nn.BatchNorm2d(F1)
         self.depthwise = nn.Conv2d(F1, F1 * D, (n_channels, 1), groups=F1)
         self.batchnorm2 = nn.BatchNorm2d(F1 * D)
@@ -38,7 +38,7 @@ class EEGNet(nn.Module):
         self.pool1 = nn.AvgPool2d((1, 4))
         self.dropout1 = nn.Dropout(dropout)
         self.separable = nn.Sequential(
-            nn.Conv2d(F1 * D, F1 * D, (1, 16), padding='same'),
+            nn.Conv2d(F1 * D, F1 * D, (1, 16), padding='same', groups=F1 * D),
             nn.Conv2d(F1 * D, F2, (1, 1)),
         )
         self.batchnorm3 = nn.BatchNorm2d(F2)
@@ -82,6 +82,7 @@ def load_data(subject):
 
 
 def train_model(model, X_train, y_train, epochs=50, lr=0.001, batch_size=32):
+    device = next(model.parameters()).device
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     losses = []
@@ -92,8 +93,8 @@ def train_model(model, X_train, y_train, epochs=50, lr=0.001, batch_size=32):
         n_batches = 0
         for start in range(0, n_samples, batch_size):
             idx = perm[start:start + batch_size]
-            batch_x = X_train[idx]
-            batch_y = y_train[idx]
+            batch_x = X_train[idx].to(device)
+            batch_y = y_train[idx].to(device)
             optimizer.zero_grad()
             outputs = model(batch_x)
             loss = criterion(outputs, batch_y)
@@ -108,11 +109,12 @@ def train_model(model, X_train, y_train, epochs=50, lr=0.001, batch_size=32):
 
 
 def evaluate_model(model, X_test, y_test):
+    device = next(model.parameters()).device
     model.eval()
     with torch.no_grad():
-        outputs = model(X_test)
+        outputs = model(X_test.to(device))
         _, predicted = torch.max(outputs, 1)
-    predicted = predicted.numpy()
+    predicted = predicted.cpu().numpy()
     accuracy = np.mean(predicted == y_test.numpy())
     cm = confusion_matrix(y_test.numpy(), predicted, labels=[0, 1])
     return accuracy, cm
@@ -121,6 +123,8 @@ def evaluate_model(model, X_test, y_test):
 def main() -> None:
     torch.manual_seed(42)
     np.random.seed(42)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
 
     X, labels = load_data(subject=1)
     print(f"Data shape: {X.shape}, labels: {len(labels)}")
@@ -138,7 +142,7 @@ def main() -> None:
 
     n_channels = X.shape[1]
     n_samples = X.shape[2]
-    model = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2)
+    model = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2).to(device)
     print(model)
 
     losses = train_model(model, X_train_t, y_train_t, epochs=50, lr=0.001)

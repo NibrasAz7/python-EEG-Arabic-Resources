@@ -21,6 +21,7 @@ from scipy.signal import iirnotch, filtfilt
 from moabb.datasets import BNCI2014_001
 from moabb.paradigms import MotorImagery
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 
 OUTPUT_DIR = Path(__file__).resolve().parent
 FS = 250
@@ -50,12 +51,18 @@ def main() -> None:
     n_trials, n_channels, n_samples = X.shape
     X_2d = X.reshape(n_trials, n_channels * n_samples)
 
+    # NOTE: scaler is fit on training data only to prevent data leakage
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_2d, labels, test_size=0.2, random_state=42, stratify=labels
+    )
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_2d)
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
     print(f"Original shape: {X.shape}")
     print(f"Reshaped shape: {X_2d.shape}")
-    print(f"Scaled shape: {X_scaled.shape}")
+    print(f"Train scaled shape: {X_train_scaled.shape}")
+    print(f"Test scaled shape: {X_test_scaled.shape}")
     print(f"Classes: {np.unique(labels)}")
     print(f"Trials per class: {[(c, np.sum(labels == c)) for c in np.unique(labels)]}")
 
@@ -66,10 +73,10 @@ def main() -> None:
     axes[0].set_title('Filtered feature distribution (first 1000 features)')
     axes[0].grid(True, alpha=0.3)
 
-    axes[1].hist(X_scaled[:, :1000].flatten(), bins=100, color='orange', alpha=0.7)
+    axes[1].hist(X_train_scaled[:, :1000].flatten(), bins=100, color='orange', alpha=0.7)
     axes[1].set_xlabel('Value')
     axes[1].set_ylabel('Count')
-    axes[1].set_title('Standardized feature distribution (first 1000 features)')
+    axes[1].set_title('Standardized feature distribution - train (first 1000 features)')
     axes[1].grid(True, alpha=0.3)
 
     plt.suptitle('Dataset Preparation - Notch Filter + Standardization', fontsize=14)

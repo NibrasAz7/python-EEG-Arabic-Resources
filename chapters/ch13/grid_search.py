@@ -22,6 +22,7 @@ from moabb.paradigms import MotorImagery
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 
 OUTPUT_DIR = Path(__file__).resolve().parent
 FS = 250
@@ -53,35 +54,36 @@ def main() -> None:
 
     features = compute_band_features(X)
 
-    scaler = StandardScaler()
-    features_scaled = scaler.fit_transform(features)
-
+    # NOTE: scaler is inside a Pipeline so it is fit only on the
+    # training fold within each CV split, preventing data leakage.
+    pipeline = Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', LogisticRegression(max_iter=1000))
+    ])
     param_grid = {
-        'C': [0.01, 0.1, 1, 10, 100],
-        'penalty': ['l1', 'l2'],
-        'solver': ['liblinear'],
+        'clf__C': [0.01, 0.1, 1, 10, 100],
+        'clf__penalty': ['l2'],
     }
 
-    clf = LogisticRegression(max_iter=1000, random_state=42)
-    grid = GridSearchCV(clf, param_grid, cv=5, scoring='accuracy')
-    grid.fit(features_scaled, labels)
+    grid = GridSearchCV(pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=1)
+    grid.fit(features, labels)
 
     print(f"Best parameters: {grid.best_params_}")
     print(f"Best CV accuracy: {grid.best_score_:.4f}")
 
     results = grid.cv_results_
     C_values = [0.01, 0.1, 1, 10, 100]
-    penalties = ['l1', 'l2']
+    penalties = ['l2']
 
     mean_acc_per_C = np.zeros(len(C_values))
     for i, c in enumerate(C_values):
-        mask_c = results['param_C'] == c
+        mask_c = results['param_clf__C'] == c
         mean_acc_per_C[i] = np.mean(results['mean_test_score'][mask_c])
 
     pivot = np.zeros((len(penalties), len(C_values)))
     for i, p in enumerate(penalties):
         for j, c in enumerate(C_values):
-            mask_p = (results['param_penalty'] == p) & (results['param_C'] == c)
+            mask_p = (results['param_clf__penalty'] == p) & (results['param_clf__C'] == c)
             pivot[i, j] = results['mean_test_score'][mask_p][0]
 
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))

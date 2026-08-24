@@ -34,7 +34,7 @@ BANDS = [(0.5, 4, 'delta'), (4, 8, 'theta'), (8, 13, 'alpha'), (13, 30, 'beta')]
 class EEGNet(nn.Module):
     def __init__(self, n_channels=22, n_samples=1001, n_classes=2, F1=8, D=2, F2=16, dropout=0.25):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, F1, (1, n_samples // 2), padding='same')
+        self.conv1 = nn.Conv2d(1, F1, (1, 64), padding='same')
         self.batchnorm1 = nn.BatchNorm2d(F1)
         self.depthwise = nn.Conv2d(F1, F1 * D, (n_channels, 1), groups=F1)
         self.batchnorm2 = nn.BatchNorm2d(F1 * D)
@@ -42,7 +42,7 @@ class EEGNet(nn.Module):
         self.pool1 = nn.AvgPool2d((1, 4))
         self.dropout1 = nn.Dropout(dropout)
         self.separable = nn.Sequential(
-            nn.Conv2d(F1 * D, F1 * D, (1, 16), padding='same'),
+            nn.Conv2d(F1 * D, F1 * D, (1, 16), padding='same', groups=F1 * D),
             nn.Conv2d(F1 * D, F2, (1, 1)),
         )
         self.batchnorm3 = nn.BatchNorm2d(F2)
@@ -89,8 +89,8 @@ def labels_to_int(labels):
     return np.array([0 if lab == 'left_hand' else 1 for lab in labels])
 
 
-def train_eegnet(X_train, y_train, n_channels, n_samples, epochs=30, lr=0.001, batch_size=32):
-    model = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2)
+def train_eegnet(X_train, y_train, n_channels, n_samples, epochs=30, lr=0.001, batch_size=32, device=torch.device('cpu')):
+    model = EEGNet(n_channels=n_channels, n_samples=n_samples, n_classes=2).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     X_train_t = torch.tensor(X_train, dtype=torch.float32).unsqueeze(1)
@@ -102,8 +102,8 @@ def train_eegnet(X_train, y_train, n_channels, n_samples, epochs=30, lr=0.001, b
         n_batches = 0
         for start in range(0, n_samples_train, batch_size):
             idx = perm[start:start + batch_size]
-            batch_x = X_train_t[idx]
-            batch_y = y_train_t[idx]
+            batch_x = X_train_t[idx].to(device)
+            batch_y = y_train_t[idx].to(device)
             optimizer.zero_grad()
             outputs = model(batch_x)
             loss = criterion(outputs, batch_y)
@@ -116,12 +116,13 @@ def train_eegnet(X_train, y_train, n_channels, n_samples, epochs=30, lr=0.001, b
 
 
 def evaluate_eegnet(model, X_test, y_test):
+    device = next(model.parameters()).device
     model.eval()
     X_test_t = torch.tensor(X_test, dtype=torch.float32).unsqueeze(1)
     with torch.no_grad():
-        outputs = model(X_test_t)
+        outputs = model(X_test_t.to(device))
         _, predicted = torch.max(outputs, 1)
-    return accuracy_score(y_test, predicted.numpy())
+    return accuracy_score(y_test, predicted.cpu().numpy())
 
 
 def extract_band_power_features(X):
@@ -142,6 +143,8 @@ def extract_band_power_features(X):
 def main() -> None:
     torch.manual_seed(42)
     np.random.seed(42)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
 
     X, labels = load_data(subject=1)
     y = labels_to_int(labels)
@@ -171,7 +174,7 @@ def main() -> None:
 
         print(" Training EEGNet...")
         torch.manual_seed(42)
-        model = train_eegnet(X_train_raw, y_train, n_channels, n_samples, epochs=30)
+        model = train_eegnet(X_train_raw, y_train, n_channels, n_samples, epochs=30, device=device)
         dl_acc = evaluate_eegnet(model, X_test_raw, y_test)
         dl_accs.append(dl_acc)
         print(f" DL accuracy: {dl_acc:.4f}")
